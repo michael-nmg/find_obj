@@ -5,7 +5,7 @@ def close_folder
 end
 
 def check_address(folder)
-  Dir.pwd == '/' ? "#{folder}" : "/#{folder}"
+  Dir.pwd == '/' ? folder : "/#{folder}"
 end
 
 ##################################################
@@ -39,6 +39,8 @@ def list_dir_folders
   (Dir.entries(Dir.pwd) - ['.', '..']).map do |i|
     (Dir.pwd + check_address(i)) if Dir.exist?(i)
   end.compact.sort
+  rescue Errno::EACCES
+    return []
 end
 
 #########################################
@@ -60,7 +62,11 @@ end
 #########################################
 
 def add_adress(arr)
-  arr.each{ |name| @arr.push(Dir.pwd + check_address(name))}
+  arr.each{ |name| @arr.push(Dir.pwd + check_address(name)) }
+end
+
+def add_adress(arr, dir)
+  arr.each{ |name| @arr.push(dir + check_address(name)) }
 end
 
 #############################################
@@ -92,12 +98,38 @@ end
 #end
 
 
+# def search_function(obj)
+#  res = include_obj?(obj)
+#  list = list_dir_folders
+#
+#  add_adress(res) if res.any?
+#
+#  list.each do |dir|
+#    unless open_folder(dir) == false
+#      search_function(obj)
+#      close_folder
+#    end unless check_way(dir) == true
+#  end if list.any?
+#end
+
 def search_function(obj)
   res = include_obj?(obj)
   list = list_dir_folders
 
   add_adress(res) if res.any?
 
+  list.each do |dir|
+      unless open_folder(dir) == false
+        search_function(obj)
+        close_folder
+      end unless check_way(dir) == true
+  end if list.any?
+end
+
+#####################################
+
+def search_function(obj)
+  list = list_dir_folders
   list.each do |dir|
     unless open_folder(dir) == false
       search_function(obj)
@@ -106,6 +138,17 @@ def search_function(obj)
   end if list.any?
 end
 
+
+def xxx(obj)
+  thread = []
+  @passed_way.each do |dir|
+    thread.push Thread.new(dir) {
+    res = Dir.entries(dir).select{ |i| i.downcase.include?(obj) }
+    res.each{ |name| @arr.push(dir + check_address(name)) } if res.any?
+    }
+  end
+  thread.each(&:join)
+end
 #########################################
 
 @passed_way = []
@@ -114,26 +157,24 @@ end
 @all_objects += (Dir.entries(Dir.pwd) - ['.', '..'])
 @all_folders += list.count
 
+##########################################################
 
 Thread.new
 
-##########################################################
+Dir.chdir("/home/michael-nmg/.rvm")
 
-/home/michael-nmg/.rvm/gems/ruby-2.3.1@global/gems/test-unit-3.1.5/lib/test/unit/ui/xml
-
-@all_objects
-
-start = Time.now
-@passed_way = []
 @arr = []
-search_function("testrunner")
+@passed_way = []
+start = Time.now
+search_function("root")
 Time.now - start
-
-@passed_way.each{|i| puts i}
 @arr.count
 @arr.uniq.count
 @passed_way.count
 @passed_way.uniq.count
+
+
+@passed_way.each{|i| puts i}
 
 
 

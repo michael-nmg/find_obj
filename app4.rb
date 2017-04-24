@@ -1,5 +1,5 @@
 class Search
-  attr_accessor :search_result, :history, :directory, :errs_log
+  attr_accessor :search_result, :history, :start_directory, :errs_log
 
   def initialize(directory = Dir.pwd)
     @search_result = []
@@ -10,25 +10,12 @@ class Search
 
   def search_function(obj)
     list = sort_list()
-    @search_result.concat( include_obj(list, obj) )
-    iter(list_dir_folders(list), obj)
-  end
-
-  private
-
-  #Итеративная функция поиска
-  def iter(list_up, obj)
-    list_dn = list_up.reduce([]) do |acc, dir|
+    @search_result.concat(include_obj(list, obj))
+    list_dir_folders(list).each do |dir|
       if open_folder(dir) && check_history(dir)
-        list = sort_list()
-        @search_result.concat( include_obj(list, obj) )
-        acc.concat(list_dir_folders(list))
-        acc
-      else
-        acc
+        search_function(obj)
       end
     end
-    list_dn.size == 0 ? put_result() : iter(list_dn, obj)
   end
 
   #Вывод общих сведений поиска
@@ -39,17 +26,24 @@ class Search
     \tErros:\t\t#{@errs_log.count}\n\n"
   end
 
+  private
+
   #Сравнение адресов с историей
   def check_history(dir)
     @history.include?(dir) ? false : @history.push(dir)
   end
 
   #Список содержимого директории
-  def sort_list
+  def sort_list()
     (Dir.entries(Dir.pwd) - ['.', '..']).sort
     rescue => err
       @errs_log[Dir.pwd] = "#{err.class}: #{err.message}"
       return []
+  end
+
+  #Выходит на уровень выше
+  def close_folder
+    Dir.chdir(Dir.pwd + '/..')
   end
 
   #Корень или нет?
