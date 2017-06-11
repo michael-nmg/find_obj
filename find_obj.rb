@@ -1,50 +1,67 @@
-class Search
-  attr_accessor :search_result, :history, :directory, :errs_log
+require './search_in_files.rb'
 
-  def initialize(directory = Dir.pwd)
-    @search_result = []
-    @history = []
+class Search
+  include SearchInFiles
+  attr_accessor :errs_log, :history, :res_in_file, :search_result, :start_directory, :type
+
+  def initialize(type = :folders)
     @errs_log = {}
-    @start_directory = directory
+    @history = []
+    @res_in_file = {}
+    @search_result = []
+    @start_directory = Dir.pwd
+    @type = type
   end
 
   def search_function(obj)
+    @type == :folders ? search_file(obj) : self.search_in_files(obj)
+  end
+
+  #Производит поиск файлов по заданной сигнатуре
+  def search_file(obj)
     list = sort_list()
     @search_result.concat( include_obj(list, obj) )
-    iter(list_dir_folders(list), obj)
+    iteration_search_dir( list_dir_elements(list)[:folders], obj )
   end
 
   private
 
-  #Итеративная функция поиска
-  def iter(list_up, obj)
+  #Рекурсивная функция обхода дирректорий
+  def iteration_search_dir(list_up, obj)
     list_dn = list_up.reduce([]) do |acc, dir|
       if open_folder(dir) && check_history(dir)
         list = sort_list()
         @search_result.concat( include_obj(list, obj) )
-        acc.concat(list_dir_folders(list))
+        acc.concat(list_dir_elements(list)[:folders])
         acc
       else
         acc
       end
     end
-    list_dn.size == 0 ? put_result() : iter(list_dn, obj)
+    list_dn.size == 0 ? put_result() : iteration_search_dir(list_dn, obj)
   end
 
   #Вывод общих сведений поиска
   def put_result()
     Dir.chdir(@start_directory)
-    print "\n\n\tSearch results:\t#{@search_result.count}\n
-    \tHistory:\t#{@history.count}\n
-    \tErros:\t\t#{@errs_log.count}\n\n"
+    if @type == :folders
+      print "\n\n\tSearch results:\t#{@search_result.count}\n
+      \tHistory:\t#{@history.count}\n
+      \tErros:\t\t#{@errs_log.count}\n\n"
+    else
+      print "\n\n\tConcurrence:\t#{@res_in_file.count}\n
+      \tHistory:\t#{@history.count}\n
+      \tErros:\t\t#{@errs_log.count}\n\n"
+    end
   end
 
+  #Полчает путь
   #Сравнение адресов с историей
   def check_history(dir)
     @history.include?(dir) ? false : @history.push(dir)
   end
 
-  #Список содержимого директории
+  #Возвращает список содержимого директории
   def sort_list
     (Dir.entries(Dir.pwd) - ['.', '..']).sort
     rescue => err
@@ -52,13 +69,15 @@ class Search
       return []
   end
 
+  #Получает элемент директории
   #Корень или нет?
   def check_address(elt)
     rest = Dir.pwd == '/' ? elt : "/#{elt}"
     Dir.pwd + rest
   end
 
-  #Открывает папку или взвращает false
+  #Получает путь
+  #Открывает папку или возвращает false
   def open_folder(dir_folder)
     Dir.chdir(dir_folder)
     rescue => err
@@ -66,18 +85,25 @@ class Search
       return false
   end
 
-  #Возвращает или [] или адреса существующих директорий
-  def list_dir_folders(dir_list)
-    dir_list.reduce([]) do |acc, folder|
-      acc.push(check_address(folder)) if Dir.exist?(folder)
+  #Получает список содержимого папки
+  #Возвращает: {} или {пути :folders и :files}
+  def list_dir_elements(dir_list)
+    dir_list.reduce({folders: [], files: []}) do |acc, elt|
+      if Dir.exist?(elt)
+        acc[:folders].push(check_address(elt))
+      else
+        acc[:files].push(check_address(elt))
+      end
       acc
     end
+
     rescue => err
       @errs_log[Dir.pwd] = "#{err.class}: #{err.message}"
-      return []
+      return {folders: [], files: []}
   end
 
-  #Возвращает или [] или адреса найденых совпадений
+  #Получает список объектов директории и сигнатуру
+  #Возвращает [] или адреса найденых совпадений
   def include_obj(dir_list, obj)
     dir_list.reduce([]) do |acc, elt|
       acc.push(check_address(elt)) if elt.downcase.include?(obj)
